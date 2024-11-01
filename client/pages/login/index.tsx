@@ -1,12 +1,22 @@
-import React, { useState } from 'react'
+import React, { useContext, useEffect, useState } from 'react'
 import { API_URL } from '../../constants'
 import { useRouter } from 'next/router'
+import { AuthContext, UserInfo } from '@/modules/auth_provider'
 
 const Index = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const { authenticated } = useContext(AuthContext)
 
   const router = useRouter()
+
+  useEffect(() => {
+    if (authenticated) {
+      router.push('/')
+      return
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authenticated])
 
   const submitHandler = async (e: React.SyntheticEvent) => {
     e.preventDefault()
@@ -20,7 +30,7 @@ const Index = () => {
 
       const data = await res.json()
       if (res.ok) {
-        const user = {
+        const user: UserInfo = {
           username: data.username,
           id: data.id,
         }
