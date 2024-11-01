@@ -19,7 +19,7 @@ export const AuthContext = createContext<{
 })
 
 const AuthContextProvider = ({ children } : { children: React.ReactNode }) => {
-  const [authenticated, setAuthenticated] = useState(false)
+  const [authenticated, setAuthenticated] = useState(true)
   const [user, setUser] = useState<UserInfo>({ username: '', id: '' })
 
   const router = useRouter()
