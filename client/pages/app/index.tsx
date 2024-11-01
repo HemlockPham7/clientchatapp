@@ -1,5 +1,10 @@
-import React, { useRef, useState } from 'react'
+import React, { useContext, useEffect, useRef, useState } from 'react'
 import ChatBody from '../../components/chat_body'
+import { WebsocketContext } from '../../modules/websocket_provider'
+import { AuthContext } from '../../modules/auth_provider'
+import { useRouter } from 'next/router'
+import { API_URL } from '../../constants'
+import autosize from 'autosize'
 
 export type Message = {
   content: string
@@ -10,27 +15,82 @@ export type Message = {
 }
 
 const Index = () => {
-  const [messages, setMessage] = useState<Array<Message>>([
-    {
-      content: 'hello1',
-      client_id: '1',
-      username: 'user1',
-      room_id: '1',
-      type: 'self',
-    },
-    {
-      content: 'hello2',
-      client_id: '2',
-      username: 'user2',
-      room_id: '1',
-      type: 'recv',
-    }
-  ])
+  const [messages, setMessage] = useState<Array<Message>>([])
   const textarea = useRef<HTMLTextAreaElement>(null)
+  const { conn } = useContext(WebsocketContext)
+  const [users, setUsers] = useState<Array<{ username: string }>>([])
+  const { user } = useContext(AuthContext)
 
+  const router = useRouter()
+
+  // get clients in the room
+  useEffect(() => {
+    if (conn === null) {
+      router.push('/')
+      return
+    }
+
+    const roomId = conn.url.split('/')[5]
+    async function getUsers() {
+      try {
+        const res = await fetch(`${API_URL}/ws/getClients/${roomId}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        })
+        const data = await res.json()
+
+        setUsers(data)
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    getUsers()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // handle websocket connection
+  useEffect(() => {
+    if (textarea.current) {
+      autosize(textarea.current)
+    }
+
+    if (conn === null) {
+      router.push('/')
+      return
+    }
+
+    conn.onmessage = (message) => {
+      const m: Message = JSON.parse(message.data)
+      if (m.content == 'A new user has joined the room') {
+        setUsers([...users, { username: m.username }])
+      }
+
+      if (m.content == 'user left the chat') {
+        const deleteUser = users.filter((user) => user.username != m.username)
+        setUsers([...deleteUser])
+        setMessage([...messages, m])
+        return
+      }
+
+      user?.username == m.username ? (m.type = 'self') : (m.type = 'recv')
+      setMessage([...messages, m])
+    }
+
+    conn.onclose = () => {}
+    conn.onerror = () => {}
+    conn.onopen = () => {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [textarea, messages, conn, users])
 
   const sendMessage = () => {
-    
+    if (!textarea.current?.value) return
+    if (conn === null) {
+      router.push('/')
+      return
+    }
+
+    conn.send(textarea.current.value)
+    textarea.current.value = ''
   }
   
   return (
